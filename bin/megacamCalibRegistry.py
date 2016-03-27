@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-# 
+#
 # LSST Data Management System
 # Copyright 2008, 2009, 2010 LSST Corporation.
-# 
+#
 # This product includes software developed by the
 # LSST Project (http://www.lsst.org/).
 #
@@ -10,14 +10,14 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
-# You should have received a copy of the LSST License Statement and 
-# the GNU General Public License along with this program.  If not, 
+#
+# You should have received a copy of the LSST License Statement and
+# the GNU General Public License along with this program.  If not,
 # see <http://www.lsstcorp.org/LegalNotices/>.
 #
 
@@ -49,7 +49,7 @@ imageTypes = {2: 'dark',
               4: 'flat',
               3: 'bias',
               6: 'fringe',
-#              5: 'mask',
+              #              5: 'mask',
               }
 
 # Key to filter names
@@ -62,6 +62,7 @@ filterNames = {0: 'NONE',
                6: 'i2',
                # Ignoring narrow-bands for now
                }
+
 
 def fixString(s):
     """Work around apparent pyfits bug: it's not terminating strings at the NULL"""
@@ -107,24 +108,26 @@ def parseDetrendDatabase(tableName, create=False):
         imageType = imageTypes[imageType]
         filterName = filterNames[filtNum]
 
-        # Remove multiple versions, since our own software doesn't yet handle selection among multiple versions
+        # Remove multiple versions, since our own software doesn't yet handle
+        # selection among multiple versions
         cur = conn.cursor()
         cmd = "DELETE FROM " + imageType + \
             " WHERE FILTER = ? AND validStart = ? AND validEnd = ? AND version <= ?"
         values = [filterName, validStart, validEnd, version]
         cur.execute(cmd, values)
- 
+
         for i in range(36):
             cmd = "INSERT OR IGNORE INTO " + imageType + " VALUES (NULL, " + ",".join("?" * len(schema)) + ")"
-            values = [path, ccdNum, version, expTime, filterName, label, validStart, validEnd, registered, i+1]
+            values = [path, ccdNum, version, expTime, filterName,
+                      label, validStart, validEnd, registered, i+1]
             conn.execute(cmd, values)
     fits.close()
     conn.commit()
     conn.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Parse the CFHT Elixir detrend database to create " + \
-                                         "a calibration registry")
+    parser = argparse.ArgumentParser(description="Parse the CFHT Elixir detrend database to create " +
+                                     "a calibration registry")
     parser.add_argument("table", nargs=1, help="FITS table to parse")
     parser.add_argument("--create", action="store_true", help="Create new registry?")
     args = parser.parse_args()

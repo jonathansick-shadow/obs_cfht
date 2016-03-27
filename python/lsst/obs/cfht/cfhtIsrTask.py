@@ -2,22 +2,24 @@ import lsst.pex.config as pexConfig
 from lsst.ip.isr import IsrTask
 import numpy as np
 
-class CfhtIsrTaskConfig(IsrTask.ConfigClass) :
+
+class CfhtIsrTaskConfig(IsrTask.ConfigClass):
     safe = pexConfig.Field(
         dtype = float,
         doc = "Safety margin for CFHT sensors gain determination",
         default = 0.95,
     )
-    
+
     def setDefaults(self):
         IsrTask.ConfigClass.setDefaults(self)
 
-class CfhtIsrTask(IsrTask) :
+
+class CfhtIsrTask(IsrTask):
     ConfigClass = CfhtIsrTaskConfig
-    
-    def run(self, ccdExposure, bias=None, dark=None,  flat=None, defects=None, fringes=None, bfKernel=None):
+
+    def run(self, ccdExposure, bias=None, dark=None, flat=None, defects=None, fringes=None, bfKernel=None):
         """Perform instrument signature removal on an exposure
-        
+
         Steps include:
         - Detect saturation, apply overscan correction, bias, dark and flat
         - Perform CCD assembly
@@ -41,47 +43,49 @@ class CfhtIsrTask(IsrTask) :
         ccd = ccdExposure.getDetector()
         floatExposure = self.convertIntToFloat(ccdExposure)
         metadata = floatExposure.getMetadata()
-        
+
         # Detect saturation
         # Saturation values recorded in the fits hader is not reliable, try to estimate it from the pixel vales
-        # Find the peak location in the high end part the pixel values' histogram and set the saturation level at 
+        # Find the peak location in the high end part the pixel values' histogram and set the saturation level at
         # safe * (peak location) where safe is a configurable parameter (typically 0.95)
         image = floatExposure.getMaskedImage().getImage()
         imageArray = image.getArray()
         maxValue = np.max(imageArray)
-        if maxValue > 60000.0 :
-            hist, bin_edges = np.histogram(imageArray.ravel(),bins=100,range=(60000.0,maxValue+1.0))
+        if maxValue > 60000.0:
+            hist, bin_edges = np.histogram(imageArray.ravel(), bins=100, range=(60000.0, maxValue+1.0))
             saturate = int(self.config.safe*bin_edges[np.argmax(hist)])
-        else :
+        else:
             saturate = metadata.get("SATURATE")
         self.log.info("Saturation set to %d" % saturate)
-        
+
         for amp in ccd:
             amp.setSaturation(saturate)
             if amp.getName() == "A":
                 amp.setGain(metadata.get("GAINA"))
                 rdnA = metadata.get("RDNOISEA")
                 # Check if the noise value is making sense for this amp. If not, replace with value stored in RDNOISE slot
-                # this change is necessary to process some old CFHT images (visit : 7xxxxx) where RDNOISEA/B = 65535
-                if rdnA > 60000.0 :
+                # this change is necessary to process some old CFHT images (visit :
+                # 7xxxxx) where RDNOISEA/B = 65535
+                if rdnA > 60000.0:
                     rdnA = metadata.get("RDNOISE")
                 amp.setReadNoise(rdnA)
             elif amp.getName() == "B":
                 amp.setGain(metadata.get("GAINB"))
                 rdnB = metadata.get("RDNOISEB")
                 # Check if the noise value is making sense for this amp. If not, replace with value stored in RDNOISE slot
-                # this change is necessary to process some old CFHT images (visit : 7xxxxx) where RDNOISEA/B = 65535
-                if rdnB > 60000.0 :
+                # this change is necessary to process some old CFHT images (visit :
+                # 7xxxxx) where RDNOISEA/B = 65535
+                if rdnB > 60000.0:
                     rdnB = metadata.get("RDNOISE")
                 amp.setReadNoise(rdnB)
-            else :
+            else:
                 raise ValueError("Unexpected amplifier name : %s"%(amp.getName()))
 
-        return IsrTask.run(self, 
-            ccdExposure = ccdExposure,
-            bias = bias,
-            dark = dark,
-            flat = flat,
-            defects = defects,
-            fringes = fringes,
-        )
+        return IsrTask.run(self,
+                           ccdExposure = ccdExposure,
+                           bias = bias,
+                           dark = dark,
+                           flat = flat,
+                           defects = defects,
+                           fringes = fringes,
+                           )

@@ -2,7 +2,7 @@ import lsst.pex.policy as pexPolicy
 import lsst.afw.table as afwTable
 import lsst.afw.geom as afwGeom
 from lsst.afw.cameraGeom import SCIENCE, FOCAL_PLANE, PUPIL, CameraConfig, DetectorConfig,\
-                                makeCameraFromCatalogs
+    makeCameraFromCatalogs
 from lsst.obs.cfht import MegacamMapper
 
 import argparse
@@ -11,7 +11,9 @@ import os
 import copy
 import shutil
 
-PIXELSIZE = 0.0135 #mm/pix
+PIXELSIZE = 0.0135  # mm/pix
+
+
 def makeCameraFromPolicy(filename, writeRepo=False, outputDir=None, doClobber=False, ccdToUse=None, shortNameMethod=lambda x: x):
     """
     Make a Camera from a paf file
@@ -23,7 +25,7 @@ def makeCameraFromPolicy(filename, writeRepo=False, outputDir=None, doClobber=Fa
     @param shortNameMethod: Method to compactify ccd names into names easily used in paths
     @return Camera object
     """
-    #This is all fragile as the CameraGeomDictionary.paf will go away.
+    # This is all fragile as the CameraGeomDictionary.paf will go away.
     policyFile = pexPolicy.DefaultPolicyFile("afw", "CameraGeomDictionary.paf", "policy")
     defPolicy = pexPolicy.Policy.createPolicy(policyFile, policyFile.getRepositoryPath(), True)
 
@@ -38,6 +40,7 @@ def makeCameraFromPolicy(filename, writeRepo=False, outputDir=None, doClobber=Fa
     if writeRepo:
         if outputDir is None:
             raise ValueError("Need output directory for writting")
+
         def makeDir(dirPath, doClobber=False):
             """Make a directory; if it exists then clobber or fail, depending on doClobber
 
@@ -60,7 +63,7 @@ def makeCameraFromPolicy(filename, writeRepo=False, outputDir=None, doClobber=Fa
 
         camConfigPath = os.path.join(outputDir, "camera.py")
         with open(camConfigPath, 'w') as outfile:
-            outfile.write("#!!!!This file is auto generated.----Do not edit!!!!\n"+\
+            outfile.write("#!!!!This file is auto generated.----Do not edit!!!!\n" +
                           "#!!!!Edit input file and regenerate with $OBS_CFHT_DIR/bin/genCameraRepository.py\n")
             camConfig.saveToStream(outfile)
 
@@ -70,6 +73,7 @@ def makeCameraFromPolicy(filename, writeRepo=False, outputDir=None, doClobber=Fa
             ampTable.writeFits(ampInfoPath)
 
     return makeCameraFromCatalogs(camConfig, ccdInfoDict['ampInfo'])
+
 
 def parseCamera(policy):
     """
@@ -82,13 +86,13 @@ def parseCamera(policy):
     camConfig.name = camPolicy.get('name')
     # Using pixel scale 0.185 arcsec/pixel from:
     # http://arxiv.org/pdf/0908.3808v1.pdf
-    camConfig.plateScale = 13.70 #arcsec/mm
+    camConfig.plateScale = 13.70  # arcsec/mm
 
     # Radial distortion correction polynomial coeff.
     conv_1 = 14805.4
     conv_2 = 13619.3
     conv_3 = 426637.0
-    
+
     tConfig = afwGeom.TransformConfig()
     tConfig.transform.name = 'inverted'
     radialClass = afwGeom.xyTransformRegistry['radial']
@@ -99,9 +103,10 @@ def parseCamera(policy):
 
     tmc = afwGeom.TransformMapConfig()
     tmc.nativeSys = FOCAL_PLANE.getSysName()
-    tmc.transforms = {PUPIL.getSysName():tConfig}
+    tmc.transforms = {PUPIL.getSysName(): tConfig}
     camConfig.transformDict = tmc
     return camConfig
+
 
 def makeAmpParams(policy):
     """
@@ -118,6 +123,7 @@ def makeAmpParams(policy):
         retParams[amp.get('ptype')]['eheight'] = amp.get('eheight')
     return retParams
 
+
 def makeCcdParams(policy, ampParms):
     """
     Construct CCD level information from the Policy
@@ -129,8 +135,8 @@ def makeCcdParams(policy, ampParms):
     for ccd in policy.getArray('Ccd'):
         ptype = ccd.get('ptype')
         tdict = {}
-        #The policy file has units of pixels, but to get to
-        #pupil coords we need to work in units of mm
+        # The policy file has units of pixels, but to get to
+        # pupil coords we need to work in units of mm
         tdict['pixelSize'] = PIXELSIZE
         tdict['offsetUnit'] = 'mm'
         tdict['ampArr'] = []
@@ -141,11 +147,11 @@ def makeCcdParams(policy, ampParms):
             ampType = amp.get('ptype')
             parms = copy.copy(ampParms[ampType])
             xsize += parms['datasec'][2] - parms['datasec'][0] + 1
-            #I think the megacam chips only have a single row of amps
+            # I think the megacam chips only have a single row of amps
             ysize = parms['datasec'][3] - parms['datasec'][1] + 1
             parms['id'] = amp.get('serial')
             parms['flipX'] = amp.get('flipLR')
-            #As far as I know there is no bilateral symmetry in megacam
+            # As far as I know there is no bilateral symmetry in megacam
             parms['flipY'] = False
             tdict['ampArr'].append(parms)
         tdict['xsize'] = xsize
@@ -153,7 +159,8 @@ def makeCcdParams(policy, ampParms):
         retParams[ptype] = tdict
     return retParams
 
-def makeEparams(policy): 
+
+def makeEparams(policy):
     """
     Construct electronic parameters for each amp in the mosaic.
     @param policy: Policy object to parse
@@ -174,15 +181,16 @@ def makeEparams(policy):
             eparms[ccd.get('name')].append(eparm)
     return eparms
 
+
 def addAmp(ampCatalog, amp, eparams):
     """ Add an amplifier to an AmpInfoCatalog
-    
+
     @param ampCatalog: An instance of an AmpInfoCatalog object to fill with amp properties
     @param amp: Dictionary of amp geometric properties
     @param eparams: Dictionary of amp electronic properties for this amp
     """
     record = ampCatalog.addNew()
- 
+
     xtot = amp['ewidth']
     ytot = amp['eheight']
 
@@ -206,12 +214,12 @@ def addAmp(ampCatalog, amp, eparams):
                              afwGeom.Extent2I(dataSec.getDimensions().getX(), pscan))
 
     if amp['flipX']:
-        #No need to flip bbox or allPixels since they
-        #are at the origin and span the full pixel grid
+        # No need to flip bbox or allPixels since they
+        # are at the origin and span the full pixel grid
         biasSec.flipLR(xtot)
         dataSec.flipLR(xtot)
         voscanSec.flipLR(xtot)
-        pscanSec.flipLR(xtot) 
+        pscanSec.flipLR(xtot)
 
     bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), dataSec.getDimensions())
     bbox.shift(afwGeom.Extent2I(dataSec.getDimensions().getX()*eparams['index'][0], 0))
@@ -224,21 +232,21 @@ def addAmp(ampCatalog, amp, eparams):
     pscanSec.shift(shiftp)
 
     record.setBBox(bbox)
-    record.setRawXYOffset(afwGeom.ExtentI(0,0))
-    #Set amplifier names according to the CFHT convention (A, B)
-    if eparams['index'][0] == 0 and eparams['index'][1] == 0 :
+    record.setRawXYOffset(afwGeom.ExtentI(0, 0))
+    # Set amplifier names according to the CFHT convention (A, B)
+    if eparams['index'][0] == 0 and eparams['index'][1] == 0:
         record.setName("A")
-    elif eparams['index'][0] == 1 and eparams['index'][1] == 0 :
+    elif eparams['index'][0] == 1 and eparams['index'][1] == 0:
         record.setName("B")
-    else :
+    else:
         raise ValueError("Unexpected index parameter %i, %i"%(eparams['index'][0], eparams['index'][1]))
-    record.setReadoutCorner(afwTable.LR if amp['flipX'] else afwTable.LL)    
+    record.setReadoutCorner(afwTable.LR if amp['flipX'] else afwTable.LL)
     record.setGain(eparams['gain'])
     record.setReadNoise(eparams['readNoise'])
     record.setSaturation(int(eparams['saturation']))
-    #The files do not have any linearity information
+    # The files do not have any linearity information
     record.setLinearityType('Proportional')
-    record.setLinearityCoeffs([1.,])
+    record.setLinearityCoeffs([1., ])
     record.setHasRawInfo(True)
     record.setRawFlipX(False)
     record.setRawFlipY(False)
@@ -247,6 +255,7 @@ def addAmp(ampCatalog, amp, eparams):
     record.setRawHorizontalOverscanBBox(biasSec)
     record.setRawVerticalOverscanBBox(voscanSec)
     record.setRawPrescanBBox(pscanSec)
+
 
 def parseCcds(policy, ccdParams, ccdToUse=None):
     """
@@ -259,7 +268,7 @@ def parseCcds(policy, ccdParams, ccdToUse=None):
     """
     specialChipMap = {}
     eParams = makeEparams(policy)
-    ampInfoDict ={}
+    ampInfoDict = {}
     ccdInfoList = []
     rafts = policy.getArray('Raft')
     if len(rafts) > 1:
@@ -306,17 +315,17 @@ def parseCcds(policy, ccdParams, ccdToUse=None):
             addAmp(ampCatalog, amp, eparms)
         ampInfoDict[ccd.get('name')] = ampCatalog
         ccdInfoList.append(detConfig)
-    return {"ccdInfo":ccdInfoList, "ampInfo":ampInfoDict}
+    return {"ccdInfo": ccdInfoList, "ampInfo": ampInfoDict}
 
 if __name__ == "__main__":
     baseDir = eups.productDir("obs_cfht")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("LayoutPolicy", help="Policy file to parse for camera information")
-    parser.add_argument("OutputDir", help="Location for the persisted camerea") 
+    parser.add_argument("OutputDir", help="Location for the persisted camerea")
     parser.add_argument("--clobber", action="store_true", dest="clobber", default=False,
-        help="remove and re-create the output directory if it exists")
+                        help="remove and re-create the output directory if it exists")
     args = parser.parse_args()
 
-    camera = makeCameraFromPolicy(args.LayoutPolicy, writeRepo=True, outputDir=args.OutputDir, ccdToUse='bottom', doClobber=args.clobber, 
-        shortNameMethod=MegacamMapper.getShortCcdName)
+    camera = makeCameraFromPolicy(args.LayoutPolicy, writeRepo=True, outputDir=args.OutputDir, ccdToUse='bottom', doClobber=args.clobber,
+                                  shortNameMethod=MegacamMapper.getShortCcdName)
